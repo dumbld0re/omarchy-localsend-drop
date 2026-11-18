@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "danny-miguel.localsend-drop",
+  "name": "LocalSend Drop",
+  "version": "0.1.0",
+  "author": "Danny-Miguel",
+  "license": "MIT",
+  "description": "Drop files on the bar icon to send them to a nearby LocalSend device.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "LocalSend Drop",
+    "description": "Drag files onto the icon, then pick a receiver.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "discoverSeconds": 8
+    },
+    "schema": [
+      {
+        "key": "discoverSeconds",
+        "type": "integer",
+        "label": "Device search time (seconds)",
+        "min": 3,
+        "max": 30,
+        "step": 1,
+        "defaultValue": 8
+      }
+    ]
+  }
+}

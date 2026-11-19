@@ -35,6 +35,9 @@ Panel {
   property string sendError: ""
   property real progress: 0
   property int cursor: -1
+  // Fingerprint of an HTTP-only device the user has picked once. Sending to
+  // it unencrypted needs a second, explicit pick.
+  property string confirmHttp: ""
 
   readonly property bool sending: sendState === "waiting" || sendState === "sending"
 
@@ -63,21 +66,39 @@ Panel {
     if (discoverProc.running) return
     devices = []
     cursor = -1
+    confirmHttp = ""
     searching = true
     discoverProc.command = ["python3", "-I", helper, "discover",
                             "--timeout", String(setting("discoverSeconds", 8))]
     discoverProc.running = true
   }
 
+  // Short, readable form of a LocalSend fingerprint, to compare with the
+  // one shown in the receiver's LocalSend settings.
+  function shortFingerprint(fp) {
+    var s = String(fp || "").replace(/[^0-9A-Fa-f]/g, "").toUpperCase().substring(0, 8)
+    return s.length === 8 ? s.substring(0, 4) + " " + s.substring(4) : ""
+  }
+
   function sendTo(device) {
     if (!device || files.length === 0 || sending) return
+    var args = ["python3", "-I", helper, "send", "--ip", device.ip, "--port", String(device.port)]
+    if (device.protocol === "http") {
+      if (confirmHttp !== device.fingerprint) {
+        confirmHttp = device.fingerprint
+        sendState = "idle"
+        return
+      }
+      args = args.concat(["--protocol", "http", "--allow-http"])
+    } else {
+      args = args.concat(["--protocol", "https", "--fingerprint", device.fingerprint])
+    }
+    confirmHttp = ""
     sendTarget = device.alias
     sendError = ""
     progress = 0
     sendState = "waiting"
-    sendProc.command = ["python3", "-I", helper, "send",
-                        "--ip", device.ip, "--port", String(device.port),
-                        "--protocol", device.protocol].concat(files)
+    sendProc.command = args.concat(["--"]).concat(files)
     sendProc.running = true
   }
 
@@ -110,8 +131,9 @@ Panel {
   onOpenedChanged: if (opened) {
     if (!sending && devices.length === 0) discover()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-  } else if (sendState === "done" || sendState === "error") {
-    sendState = "idle"
+  } else {
+    confirmHttp = ""
+    if (sendState === "done" || sendState === "error") sendState = "idle"
   }
 
   Process {
@@ -274,6 +296,7 @@ Panel {
                 : root.sendState === "sending" ? "Sending to " + root.sendTarget + " · " + Math.round(root.progress * 100) + "%"
                 : root.sendState === "done" ? "Sent to " + root.sendTarget
                 : root.sendState === "error" ? root.sendError
+                : root.confirmHttp !== "" ? "Unencrypted device: pick it again to send anyway"
                 : root.files.length > 0 ? "Pick a receiver"
                 : "Drop files here"
             foreground: root.foreground
@@ -489,7 +512,10 @@ Panel {
                       Layout.fillWidth: true
                       textFormat: Text.PlainText
                       text: (row.modelData.deviceModel ? row.modelData.deviceModel + " · " : "") + row.modelData.ip
-                      color: root.dim
+                            + (row.modelData.protocol === "http" ? " · unencrypted"
+                               : " · " + root.shortFingerprint(row.modelData.fingerprint))
+                      color: row.modelData.protocol === "http" && root.confirmHttp === row.modelData.fingerprint
+                             ? root.urgent : root.dim
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                       elide: Text.ElideRight

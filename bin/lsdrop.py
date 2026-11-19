@@ -325,8 +325,13 @@ class Discovery:
 
 def send(ip, port, protocol, paths, expected_fp=None, allow_http=False):
     if protocol == "https":
+        if expected_fp is None:
+            # A panel loaded before the fingerprint-pinning update calls the
+            # helper without --fingerprint. Reloading the shell fixes it.
+            emit({"event": "error", "message": "Plugin was updated, reload the shell (omarchy-restart-shell) and try again"})
+            return 1
         if not is_sha256_hex(expected_fp):
-            emit({"event": "error", "message": "Missing or invalid receiver fingerprint"})
+            emit({"event": "error", "message": "Invalid receiver fingerprint, search again"})
             return 1
     elif protocol == "http":
         if not allow_http:
